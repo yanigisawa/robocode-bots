@@ -15,7 +15,7 @@ public class SeekAndDestroy extends AdvancedRobot {
 	public void run() {
 		setAdjustRadarForRobotTurn(true);//keep the radar still while we turn
 		setColors(Color.BLACK, Color.LIGHT_GRAY, Color.DARK_GRAY);
-		setBulletColor(Color.blue);
+		setBulletColor(Color.MAGENTA);
 		setAdjustGunForRobotTurn(true); // Keep the gun still when we turn
 		turnRadarRightRadians(Double.POSITIVE_INFINITY); //keep turning radar right
 	}
@@ -86,10 +86,23 @@ public class SeekAndDestroy extends AdvancedRobot {
 		turnRight(-e.getBearing());
 	}
 	
+	public void onHitByBullet(HitByBulletEvent e) {
+		log("\tHit, bearing %s", e.getBearing());
+		
+		if (getDistanceRemaining() == 0) {
+			setTurnRight(90 + e.getBearing() * hitTurnDirection);
+			setAhead(100);
+		}
+		
+		hitTurnDirection *= -1;
+	}
+	
 	public void onWin(WinEvent e) {
-		for (int i = 0; i < 50; i++) {
-			turnRight(30);
+		for (int i = 0; i < 5; i++) {			
+			turnGunRight(60);
 			turnLeft(30);
+			turnGunLeft(60);
+			turnRight(30);
 		}
 	}
 	
@@ -103,16 +116,7 @@ public class SeekAndDestroy extends AdvancedRobot {
 		}
 		
 		return haveScanned;
-	}
-	
-	
-	public void onHitByBullet(HitByBulletEvent e) {
-		log("\tHit, bearing %s", e.getBearing());
-		setTurnRight(90 * hitTurnDirection);
-		setAhead(500);
-		
-		hitTurnDirection *= -1;
-	}
+	}	
 	
 	private void clearNearestTarget() {
 		scannedRobots = new Vector<>();
@@ -121,7 +125,8 @@ public class SeekAndDestroy extends AdvancedRobot {
 	}
 	
 	private void customFire(ScannedRobotEvent e) {
-		if (e == null) { return; }
+		if (e == null || getGunTurnRemaining() > 0) { return; }
+		
 		double height = getHeight();
 		double distance = e.getDistance();
 		double power = 0.5;
