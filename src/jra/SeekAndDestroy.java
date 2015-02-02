@@ -10,7 +10,6 @@ public class SeekAndDestroy extends AdvancedRobot {
 	Vector<ScannedRobotEvent> scannedRobots = new Vector<>();
 	ScannedRobotEvent nearestRobot;
 	int hitTurnDirection = 1;
-	boolean attack = false;
 	
 	public void run() {
 		setAdjustRadarForRobotTurn(true);//keep the radar still while we turn
@@ -21,23 +20,23 @@ public class SeekAndDestroy extends AdvancedRobot {
 	}
 	
 	public void onScannedRobot(ScannedRobotEvent e) {
-		log("Scanned %s - scannedSize: %s - haveScanned %s", e.getName(), scannedRobots.size(), haveScannedRobot(e));
-		
-		if (scannedRobots.size() < getOthers() && !haveScannedRobot(e) && !attack) {
+		if (scannedRobots.size() < (getTotalOtherRobots())) {
+			log("Adding, Scanned %s - scannedSize: %s - haveScanned %s", e.getName(), scannedRobots.size(), haveScannedRobot(e));
 			// Scan all robots first, keeping track of the closest one
 			scannedRobots.add(e);
-			if (nearestRobot == null) {
-				nearestRobot = e;
-			} else if (e.getDistance() < nearestRobot.getDistance() && !e.isSentryRobot()) {
-				nearestRobot = e;
+			if (e.isSentryRobot()) {
+				return;
 			}
 			
-			if (nearestRobot.getDistance() <= 150) { attack = true; }
-			return;
+			if (nearestRobot == null) {
+				nearestRobot = e;
+			} else if (e.getDistance() < nearestRobot.getDistance()) {
+				nearestRobot = e;
+			}
 		} else {
 			// All robots scanned, move to the closest one
 			
-			if (nearestRobot.getName().equals(e.getName())) {				
+			if (nearestRobot.getName().equals(e.getName())) {
 				nearestRobot = e;
 												
 				setTurnGunRightRadians(getGunTurnRadians(nearestRobot));
@@ -45,14 +44,18 @@ public class SeekAndDestroy extends AdvancedRobot {
 				
 				setTurnRightRadians(getTurnRadians(nearestRobot));
 				setAhead(nearestRobot.getDistance() - 50);
-			}			
+			}
+			
+			if (shouldResetNearestRobot(e)) {
+				clearNearestTarget();
+			}
 		}	
-		
-		if (shouldResetNearestRobot(e)) {
-			clearNearestTarget();
-		}
 	}
 	
+	private int getTotalOtherRobots() {
+		return getOthers() + getNumSentries();
+	}
+
 	private double getTurnRadians(ScannedRobotEvent targetRobot) {
 		double absBearing = targetRobot.getBearingRadians() + getHeadingRadians();
 		double lateralVelocity = targetRobot.getVelocity() * Math.sin(targetRobot.getHeadingRadians() - absBearing);
@@ -70,16 +73,15 @@ public class SeekAndDestroy extends AdvancedRobot {
 	}
 
 	private boolean shouldResetNearestRobot(ScannedRobotEvent e) {
-		boolean nearestChangedDistance = e.getName().equals(nearestRobot.getName()) 
-				&& e.getBearing() != nearestRobot.getBearing();
-		boolean someBotDied = scannedRobots.size() != getOthers();
-		
-		return nearestChangedDistance || someBotDied;
+			
+		return scannedRobots.size() > getTotalOtherRobots();
 	}
 	
 			
 	public void onHitRobot(HitRobotEvent e) {
-		ahead(0); // Stop movement
+		if (e.getName() != nearestRobot.getName()) {
+			clearNearestTarget();
+		}
 	}
 	
 	public void onHitWall(HitWallEvent e) {
@@ -87,14 +89,11 @@ public class SeekAndDestroy extends AdvancedRobot {
 	}
 	
 	public void onHitByBullet(HitByBulletEvent e) {
-		log("\tHit, bearing %s", e.getBearing());
-		
 		if (getDistanceRemaining() == 0) {
 			setTurnRight(90 + e.getBearing() * hitTurnDirection);
 			setAhead(100);
+			hitTurnDirection *= -1;
 		}
-		
-		hitTurnDirection *= -1;
 	}
 	
 	public void onWin(WinEvent e) {
@@ -121,7 +120,6 @@ public class SeekAndDestroy extends AdvancedRobot {
 	private void clearNearestTarget() {
 		scannedRobots = new Vector<>();
 		nearestRobot = null;
-		attack = false;
 	}
 	
 	private void customFire(ScannedRobotEvent e) {
